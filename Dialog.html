@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --success: #16a34a;
+        --bg-gray: #f8fafc;
+        --text-main: #1e293b;
+        --text-sub: #64748b;
+        --border: #e2e8f0;
+      }
+
+      body {
+        font-family: 'Poppins', sans-serif;
+        background-color: #ffffff;
+        color: var(--text-main);
+        padding: 24px;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+      }
+
+      p.subtitle {
+        margin: 4px 0 24px 0;
+        font-size: 13px;
+        color: var(--text-sub);
+      }
+
+      /* Inputs */
+      .checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+        cursor: pointer;
+      }
+      .checkbox-wrapper input {
+        margin: 0 10px 0 2px;
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+      .checkbox-wrapper label {
+        font-size: 13px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .input-group { margin-bottom: 24px; }
+      
+      label.input-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-sub);
+        text-transform: uppercase;
+      }
+      
+      select {
+        width: 100%;
+        padding: 12px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 14px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background-color: var(--bg-gray);
+        color: var(--text-main);
+        outline: none;
+        cursor: pointer;
+      }
+      select:disabled { background-color: #f1f5f9; color: #94a3b8; }
+
+      /* Button */
+      button {
+        width: 100%;
+        height: 48px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: none;
+        border-radius: 6px;
+        font-family: 'Poppins', sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+        color: white;
+        background-color: var(--primary);
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      button:hover:not(:disabled) { background-color: var(--primary-hover); }
+      button:disabled { background-color: #ccc; cursor: not-allowed; }
+      button.success { background-color: var(--success); }
+
+      #status {
+        margin-top: 16px;
+        font-size: 12px;
+        text-align: center;
+        color: var(--text-sub);
+        min-height: 20px;
+      }
+      .error { color: #dc2626; }
+      .success-text { color: var(--success); font-weight: 500; }
+    </style>
+  </head>
+  <body>
+
+    <p class="subtitle">Select a month to create the planning sheet.</p>
+
+    <div class="checkbox-wrapper" onclick="document.getElementById('showArchived').click()">
+      <input type="checkbox" id="showArchived" onchange="event.stopPropagation(); app.loadMonths()">
+      <label for="showArchived">Show archived dates</label>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Available Months</label>
+      <select id="monthSelect" disabled>
+        <option>Loading...</option>
+      </select>
+    </div>
+    
+    <button onclick="app.generate()" id="btn" disabled>LOADING DATA...</button>
+    <div id="status"></div>
+
+    <script>
+      const app = {
+        loadMonths: function() {
+          const showArchived = document.getElementById('showArchived').checked;
+          this.toggleState(true, 'LOADING DATA...');
+          
+          google.script.run
+            .withSuccessHandler(this.onMonthsLoaded.bind(this))
+            .withFailureHandler(this.onError.bind(this))
+            .apiGetAvailableMonths(showArchived);
+        },
+
+        onMonthsLoaded: function(months) {
+          const select = document.getElementById('monthSelect');
+          select.innerHTML = '';
+          
+          if (!months || months.length === 0) {
+            select.add(new Option("No dates found", ""));
+            this.toggleState(true, 'NO DATA');
+            return;
+          }
+
+          months.forEach(m => select.add(new Option(m, m)));
+          this.toggleState(false, 'GENERATE TABLE');
+        },
+
+        generate: function() {
+          const select = document.getElementById('monthSelect');
+          if (!select.value) return;
+
+          this.toggleState(true, 'PROCESSING...');
+          document.getElementById('status').innerText = 'Creating structure...';
+
+          google.script.run
+            .withSuccessHandler(this.onSuccess.bind(this))
+            .withFailureHandler(this.onError.bind(this))
+            .apiGenerateTable(select.value);
+        },
+
+        onSuccess: function(response) {
+          const btn = document.getElementById('btn');
+          const status = document.getElementById('status');
+          
+          btn.classList.add('success');
+          btn.innerText = 'SUCCESS';
+          status.innerHTML = `<span class="success-text">${response}</span>`;
+
+          setTimeout(() => {
+            btn.classList.remove('success');
+            this.toggleState(false, 'GENERATE TABLE');
+          }, 2000);
+        },
+
+        onError: function(error) {
+          this.toggleState(false, 'TRY AGAIN');
+          document.getElementById('status').innerHTML = `<span class="error">Error: ${error.message}</span>`;
+        },
+
+        toggleState: function(disabled, text) {
+          const btn = document.getElementById('btn');
+          const select = document.getElementById('monthSelect');
+          
+          btn.disabled = disabled;
+          btn.innerText = text;
+          select.disabled = disabled;
+        }
+      };
+
+      // Init
+      window.onload = () => app.loadMonths();
+    </script>
+  </body>
+</html>
